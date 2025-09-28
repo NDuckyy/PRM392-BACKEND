@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -24,8 +25,7 @@ public class ChatMessage {
     @Column(name = "Message")
     private String message;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "SentAt", nullable = false)
-    private Instant sentAt;
+    private Date sentAt;
 
 }

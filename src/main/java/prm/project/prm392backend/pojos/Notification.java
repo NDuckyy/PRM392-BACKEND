@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -27,8 +28,7 @@ public class Notification {
     @Column(name = "IsRead", nullable = false)
     private Boolean isRead = false;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "CreatedAt", nullable = false)
-    private Instant createdAt;
+    private Date createdAt;
 
 }

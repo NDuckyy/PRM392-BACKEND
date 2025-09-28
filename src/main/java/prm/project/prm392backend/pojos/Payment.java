@@ -7,6 +7,7 @@ import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -24,9 +25,8 @@ public class Payment {
     @Column(name = "Amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "PaymentDate", nullable = false)
-    private Instant paymentDate;
+    private Date paymentDate;
 
     @Column(name = "PaymentStatus", nullable = false, length = 50)
     private String paymentStatus;
