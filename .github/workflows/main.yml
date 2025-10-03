@@ -1,0 +1,64 @@
+name: CI/CD Deploy to VPS using Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Clean old source code on VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          port: 22
+          script: |
+            rm -rf "${{ vars.TARGET_DIR }}"
+
+      - name: Copy source code to VPS via SCP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          port: 22
+          source: "."
+          target: "${{ vars.TARGET_DIR }}"
+          overwrite: true
+          timeout: 1m
+          command_timeout: 10m
+
+      - name: SSH into VPS and deploy container
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          port: 22
+          script: |
+            set -e
+            APP_DIR="${{ vars.TARGET_DIR }}"
+            SERVICE="${{ vars.SERVICE_NAME }}"
+
+            cd "$APP_DIR"
+
+            # Dừng & xóa container cũ (nếu tồn tại)
+            docker stop "$SERVICE" 2>/dev/null || true
+            docker rm "$SERVICE" 2>/dev/null || true
+
+            # Build lại Docker image (tag theo SERVICE)
+            docker build --no-cache -t "$SERVICE" .
+
+            # Chạy 1 container duy nhất, map port 1801 -> 8080
+            docker run -d --name "$SERVICE" -p 2170:8080 "$SERVICE"
