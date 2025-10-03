@@ -15,6 +15,7 @@ import java.util.Date;
 public class Notification {
     @Id
     @Column(name = "NotificationID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)

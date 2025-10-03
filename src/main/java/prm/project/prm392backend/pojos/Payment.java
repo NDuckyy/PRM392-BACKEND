@@ -16,6 +16,7 @@ import java.util.Date;
 public class Payment {
     @Id
     @Column(name = "PaymentID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)

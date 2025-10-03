@@ -15,6 +15,7 @@ import java.util.Date;
 public class ChatMessage {
     @Id
     @Column(name = "ChatMessageID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)

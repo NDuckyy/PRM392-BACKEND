@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 public class CartItem {
     @Id
     @Column(name = "CartItemID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)

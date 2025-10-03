@@ -1,9 +1,6 @@
 package prm.project.prm392backend.pojos;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,6 +13,7 @@ import java.math.BigDecimal;
 public class StoreLocation {
     @Id
     @Column(name = "LocationID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name = "Latitude", nullable = false, precision = 9, scale = 6)

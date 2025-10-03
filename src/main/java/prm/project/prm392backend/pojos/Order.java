@@ -15,6 +15,7 @@ import java.util.Date;
 public class Order {
     @Id
     @Column(name = "OrderID", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
