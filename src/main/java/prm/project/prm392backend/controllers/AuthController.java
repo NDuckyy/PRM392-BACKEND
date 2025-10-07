@@ -19,11 +19,13 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
 
-    public AuthController(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder) {
+    public AuthController(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -62,7 +64,7 @@ public class AuthController {
         return userRepository.findByUsername(request.getUsername())
                 .filter(user -> passwordEncoder.matches(request.getPassword(), user.getPasswordHash()))
                 .map(user -> {
-                    String token = JwtUtil.generateToken(user.getUsername(), user.getRole());
+                    String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
                     response.setMessage("Login successful!");
                     response.setUsername(user.getUsername());
                     response.setRole(user.getRole());
