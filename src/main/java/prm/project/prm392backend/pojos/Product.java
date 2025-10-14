@@ -35,7 +35,7 @@ public class Product {
     @Column(name = "ImageURL")
     private String imageURL;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "CategoryID")
     private Category categoryID;
 
