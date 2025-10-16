@@ -2,8 +2,7 @@ name: CI/CD Deploy to VPS using Docker
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -12,6 +11,11 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      # (tuỳ chọn) bỏ các file không cần đưa lên VPS để context build gọn hơn
+      - name: Prune context
+        run: |
+          rm -rf .git .github .idea target || true
 
       - name: Clean old source code on VPS
         uses: appleboy/ssh-action@v1.0.0
@@ -22,7 +26,12 @@ jobs:
           passphrase: ${{ secrets.VPS_PASSPHRASE }}
           port: 22
           script: |
-            rm -rf "${{ vars.TARGET_DIR }}"
+            set -e
+            sudo mkdir -p /opt/keys/firebase
+            sudo mkdir -p "${{ vars.TARGET_DIR }}"
+            # Ghi secret FIREBASE_SA_B64 thành file JSON (an toàn, không lưu trong repo)
+            echo "${{ secrets.FIREBASE_SA_B64 }}" | base64 -d | sudo tee /opt/keys/firebase/serviceAccount.json >/dev/null
+            sudo chmod 600 /opt/keys/firebase/serviceAccount.json
 
       - name: Copy source code to VPS via SCP
         uses: appleboy/scp-action@v0.1.4
@@ -35,7 +44,7 @@ jobs:
           source: "."
           target: "${{ vars.TARGET_DIR }}"
           overwrite: true
-          timeout: 1m
+          timeout: 2m
           command_timeout: 10m
 
       - name: SSH into VPS and deploy container
@@ -50,15 +59,22 @@ jobs:
             set -e
             APP_DIR="${{ vars.TARGET_DIR }}"
             SERVICE="${{ vars.SERVICE_NAME }}"
-
             cd "$APP_DIR"
 
-            # Dừng & xóa container cũ (nếu tồn tại)
+            # Dừng & xoá container cũ (nếu có)
             docker stop "$SERVICE" 2>/dev/null || true
             docker rm "$SERVICE" 2>/dev/null || true
 
-            # Build lại Docker image (tag theo SERVICE)
-            docker build --no-cache -t "$SERVICE" .
+            # Build image (tag theo SERVICE)
+            docker build -t "$SERVICE" .
 
-            # Chạy 1 container duy nhất, map port 1801 -> 8080
-            docker run -d --name "$SERVICE" -p 2170:8080 "$SERVICE"
+            # Chạy container, mount serviceAccount.json vào container ở /run/secrets/firebase_sa.json
+            docker run -d --name "$SERVICE" \
+              -p 2170:8080 \
+              -v /opt/keys/firebase/serviceAccount.json:/run/secrets/firebase_sa.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase_sa.json \
+              "$SERVICE"
+
+            # Kiểm tra log khởi động nhanh
+            sleep 3
+            docker logs --tail=100 "$SERVICE" || true
