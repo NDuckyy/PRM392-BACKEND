@@ -61,6 +61,8 @@ jobs:
             SERVICE="${{ vars.SERVICE_NAME }}"
             cd "$APP_DIR"
 
+            chmod 644 /opt/keys/firebase/serviceAccount.json
+
             # Dừng & xoá container cũ (nếu có)
             docker stop "$SERVICE" 2>/dev/null || true
             docker rm "$SERVICE" 2>/dev/null || true
