@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn -q -DskipTests package
 
 # ---------- STAGE 2: RUNTIME ----------
-FROM eclipse-temurin:21-jre  # ⚠️ Dùng Debian, không dùng Alpine
+FROM eclipse-temurin:21-jre
 
 RUN addgroup --system app && adduser --system --ingroup app app
 USER app
