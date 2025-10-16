@@ -11,6 +11,8 @@ RUN mvn -q -DskipTests package
 # ---------- STAGE 2: RUNTIME ----------
 FROM eclipse-temurin:21-jre-alpine
 
+USER root
+RUN apk add --no-cache ca-certificates tzdata curl
 RUN addgroup -S app && adduser -S app -G app
 USER app
 WORKDIR /app
@@ -18,7 +20,8 @@ WORKDIR /app
 COPY --from=builder /build/target/*.jar /app/app.jar
 
 EXPOSE 8080
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0" \
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0" \
     SPRING_PROFILES_ACTIVE=prod
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+
