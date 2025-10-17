@@ -1,9 +1,11 @@
 package prm.project.prm392backend.controllers;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.configs.JwtUtil;
 import prm.project.prm392backend.dtos.*;
 import prm.project.prm392backend.pojos.Cart;
 import prm.project.prm392backend.pojos.CartItem;
@@ -37,8 +39,10 @@ public class CartController {
     @Autowired
     ModelMapper modelMapper;
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<?> getCurrentCartByUserId(@PathVariable Integer userId){
+    @GetMapping("/current")
+    public ResponseEntity<?> getCurrentCartByUserId(@Parameter(hidden = true)
+                                                        @RequestHeader(name = "Authorization", required = false) String token){
+        Integer userId = JwtUtil.extractUserId(token);
         User user = userRepository.findUserById(userId);
         Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
         CartResponse cartResponse = modelMapper.map(cart, CartResponse.class);
@@ -57,8 +61,11 @@ public class CartController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<?> cartInsert(@RequestBody CartInsertRequest request){
-        User user = userRepository.findUserById(request.getUserId());
+    public ResponseEntity<?> cartInsert(@RequestBody CartInsertRequest request,
+                                        @Parameter(hidden = true)
+                                        @RequestHeader(name = "Authorization", required = false) String token){
+        Integer userId = JwtUtil.extractUserId(token);
+        User user = userRepository.findUserById(userId);
         Product product = productRepository.findProductById(request.getProductId());
         if (product == null) {
             return ResponseEntity.status(404).body("Product not found with ID: " + request.getProductId());
@@ -147,8 +154,10 @@ public class CartController {
         return ResponseEntity.ok("Cart item removed from cart");
     }
 
-    @DeleteMapping("/clear/{userId}")
-    public ResponseEntity<?> cartClear(@PathVariable Integer userId){
+    @DeleteMapping("/clear/current")
+    public ResponseEntity<?> cartClear(@Parameter(hidden = true)
+                                           @RequestHeader(name = "Authorization", required = false) String token){
+        Integer userId = JwtUtil.extractUserId(token);
         User user = userRepository.findUserById(userId);
         Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
         if(cart!=null){
