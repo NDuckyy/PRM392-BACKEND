@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import prm.project.prm392backend.configs.JwtUtil;
+import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.AuthResponse;
 import prm.project.prm392backend.dtos.LoginRequest;
 import prm.project.prm392backend.dtos.RegisterRequest;
@@ -29,15 +30,19 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(@RequestBody RegisterRequest request) {
-        AuthResponse response = new AuthResponse();
+    public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest request) {
+        ApiResponse<AuthResponse> response = new ApiResponse<>();
+        AuthResponse authResponse = new AuthResponse();
 
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             response.setMessage("Username already exists!");
+            response.setCode(400);
             return response;
         }
+
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             response.setMessage("Email already exists!");
+            response.setCode(400);
             return response;
         }
 
@@ -51,29 +56,37 @@ public class AuthController {
 
         userRepository.save(user);
 
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+
+        authResponse.setUsername(user.getUsername());
+        authResponse.setRole(user.getRole());
+        authResponse.setToken(token);
+
         response.setMessage("User registered successfully!");
-        response.setUsername(user.getUsername());
-        response.setRole(user.getRole());
+        response.setData(authResponse);
+        response.setCode(200);
+
         return response;
     }
 
-    @PostMapping("/login")
-    public AuthResponse login(@RequestBody LoginRequest request) {
-        AuthResponse response = new AuthResponse();
 
-        return userRepository.findByUsername(request.getUsername())
-                .filter(user -> passwordEncoder.matches(request.getPassword(), user.getPasswordHash()))
-                .map(user -> {
-                    String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
-                    response.setMessage("Login successful!");
-                    response.setUsername(user.getUsername());
-                    response.setRole(user.getRole());
-                    response.setToken(token);
-                    return response;
-                })
-                .orElseGet(() -> {
-                    response.setMessage("Invalid username or password");
-                    return response;
-                });
+    @PostMapping("/login")
+    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
+        ApiResponse<AuthResponse> response = new ApiResponse<>();
+        User user = userRepository.findByUsername(request.getUsername()).orElse(null);
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            response.setMessage("Invalid username or password!");
+            response.setCode(400);
+            return response;
+        }
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        AuthResponse authResponse = new AuthResponse();
+        authResponse.setUsername(user.getUsername());
+        authResponse.setRole(user.getRole());
+        authResponse.setToken(token);
+        response.setMessage("Login successful!");
+        response.setData(authResponse);
+        return response;
+
     }
 }

@@ -1,10 +1,8 @@
 package prm.project.prm392backend.controllers;
 
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.CreateOrUpdateProductRequest;
 import prm.project.prm392backend.pojos.Category;
 import prm.project.prm392backend.pojos.Product;
@@ -25,11 +23,29 @@ public class ProductController {
     private CategoryRepository categoryRepository;
 
     @PostMapping
-    public ResponseEntity<?> createProduct(@RequestBody CreateOrUpdateProductRequest request) {
+    public ApiResponse<Product> createProduct(@RequestBody CreateOrUpdateProductRequest request) {
+        ApiResponse<Product> res = new ApiResponse<>();
+
+        // Validate cơ bản
+        if (request == null || request.getCategoryId() == null) {
+            res.setCode(400);
+            res.setMessage("categoryId is required");
+            res.setData(null);
+            return res;
+        }
+        if (request.getProductName() == null || request.getProductName().trim().isEmpty()) {
+            res.setCode(400);
+            res.setMessage("productName is required");
+            res.setData(null);
+            return res;
+        }
+
         Optional<Category> category = categoryRepository.findById(request.getCategoryId());
         if (category.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Category not found with id = " + request.getCategoryId());
+            res.setCode(400);
+            res.setMessage("Category not found with id = " + request.getCategoryId());
+            res.setData(null);
+            return res;
         }
 
         Product product = new Product();
@@ -42,38 +58,73 @@ public class ProductController {
         product.setCategoryID(category.get());
 
         Product saved = productRepository.save(product);
-        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+
+        res.setCode(201);
+        res.setMessage("Product created successfully");
+        res.setData(saved);
+        return res;
     }
 
     @GetMapping
-    public ResponseEntity<List<Product>> getAllProducts() {
+    public ApiResponse<List<Product>> getAllProducts() {
+        ApiResponse<List<Product>> res = new ApiResponse<>();
         List<Product> products = productRepository.findAll();
-        return ResponseEntity.ok(products);
+
+        res.setCode(200);
+        res.setMessage("Fetched products successfully");
+        res.setData(products);
+        return res;
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable Integer id) {
+    public ApiResponse<Product> getProductById(@PathVariable Integer id) {
+        ApiResponse<Product> res = new ApiResponse<>();
         Optional<Product> product = productRepository.findById(id);
+
         if (product.isPresent()) {
-            return ResponseEntity.ok(product.get());
+            res.setCode(200);
+            res.setMessage("Fetched product successfully");
+            res.setData(product.get());
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Product not found with id = " + id);
+            res.setData(null);
         }
+        return res;
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProduct(@PathVariable Integer id, @RequestBody CreateOrUpdateProductRequest request) {
+    public ApiResponse<Product> updateProduct(@PathVariable Integer id,
+                                              @RequestBody CreateOrUpdateProductRequest request) {
+        ApiResponse<Product> res = new ApiResponse<>();
+
         Optional<Product> existing = productRepository.findById(id);
         if (existing.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Product not found with id = " + id);
+            res.setData(null);
+            return res;
+        }
+
+        if (request == null || request.getCategoryId() == null) {
+            res.setCode(400);
+            res.setMessage("categoryId is required");
+            res.setData(null);
+            return res;
+        }
+        if (request.getProductName() == null || request.getProductName().trim().isEmpty()) {
+            res.setCode(400);
+            res.setMessage("productName is required");
+            res.setData(null);
+            return res;
         }
 
         Optional<Category> category = categoryRepository.findById(request.getCategoryId());
         if (category.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Category not found with id = " + request.getCategoryId());
+            res.setCode(400);
+            res.setMessage("Category not found with id = " + request.getCategoryId());
+            res.setData(null);
+            return res;
         }
 
         Product product = existing.get();
@@ -86,16 +137,29 @@ public class ProductController {
         product.setCategoryID(category.get());
 
         Product updated = productRepository.save(product);
-        return ResponseEntity.ok(updated);
+
+        res.setCode(200);
+        res.setMessage("Product updated successfully");
+        res.setData(updated);
+        return res;
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteProduct(@PathVariable Integer id) {
+    public ApiResponse<String> deleteProduct(@PathVariable Integer id) {
+        ApiResponse<String> res = new ApiResponse<>();
+
         if (!productRepository.existsById(id)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Product not found with id = " + id);
+            res.setData(null);
+            return res;
         }
+
         productRepository.deleteById(id);
-        return ResponseEntity.ok("Deleted product with id = " + id);
+
+        res.setCode(200);
+        res.setMessage("Product deleted successfully");
+        res.setData("Deleted product with id = " + id);
+        return res;
     }
 }

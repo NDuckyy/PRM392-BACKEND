@@ -2,8 +2,8 @@ package prm.project.prm392backend.controllers;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.OrderCreateRequest;
 import prm.project.prm392backend.dtos.OrderCreateResponse;
 import prm.project.prm392backend.pojos.Cart;
@@ -32,25 +32,48 @@ public class OrderController {
     @Autowired
     ModelMapper modelMapper;
 
-    @PostMapping()
-    public ResponseEntity<?> create(@RequestBody OrderCreateRequest request){
-        User user = userRepository.findUserById(request.getUserId());
-        Cart cart = cartRepository.findCartByUserIDAndStatus(user, "ACTIVE");
-        if(cart!=null){
-            Order order = new Order();
-            order.setUserID(user);
-            order.setCartID(cart);
-            order.setBillingAddress(request.getBillingAddress());
-            order.setPaymentMethod(request.getPaymentMethod());
-            order.setOrderDate(new Date());
-            order.setOrderStatus("WAITING PAYMENT");
-            orderRepository.save(order);
-            OrderCreateResponse response = modelMapper.map(order,OrderCreateResponse.class);
-            return ResponseEntity.ok(response);
-        }else{
-            return ResponseEntity.status(404).body("Not found cart");
+    @PostMapping
+    public ApiResponse<OrderCreateResponse> create(@RequestBody OrderCreateRequest request) {
+        ApiResponse<OrderCreateResponse> res = new ApiResponse<>();
+
+        if (request == null || request.getUserId() == null) {
+            res.setCode(400);
+            res.setMessage("userId is required");
+            res.setData(null);
+            return res;
         }
+
+        User user = userRepository.findUserById(request.getUserId());
+        if (user == null) {
+            res.setCode(404);
+            res.setMessage("User not found with id = " + request.getUserId());
+            res.setData(null);
+            return res;
+        }
+
+        Cart cart = cartRepository.findCartByUserIDAndStatus(user, "ACTIVE");
+        if (cart == null) {
+            res.setCode(404);
+            res.setMessage("Active cart not found for user");
+            res.setData(null);
+            return res;
+        }
+
+        Order order = new Order();
+        order.setUserID(user);
+        order.setCartID(cart);
+        order.setBillingAddress(request.getBillingAddress());
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setOrderDate(new Date());
+        order.setOrderStatus("WAITING PAYMENT");
+
+        orderRepository.save(order);
+
+        OrderCreateResponse data = modelMapper.map(order, OrderCreateResponse.class);
+
+        res.setCode(201); // Created
+        res.setMessage("Order created successfully");
+        res.setData(data);
+        return res;
     }
-
-
 }

@@ -2,7 +2,6 @@ package prm.project.prm392backend.controllers;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.dtos.*;
 import prm.project.prm392backend.pojos.Cart;
@@ -19,7 +18,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/cart")
-@CrossOrigin("*")
 public class CartController {
 
     @Autowired
@@ -38,128 +36,236 @@ public class CartController {
     ModelMapper modelMapper;
 
     @GetMapping("/{userId}")
-    public ResponseEntity<?> getCurrentCartByUserId(@PathVariable Integer userId){
+    public ApiResponse<CartResponse> getCurrentCartByUserId(@PathVariable Integer userId){
+        ApiResponse<CartResponse> res = new ApiResponse<>();
+
         User user = userRepository.findUserById(userId);
+        if (user == null) {
+            res.setCode(404);
+            res.setMessage("User not found with ID: " + userId);
+            res.setData(null);
+            return res;
+        }
+
         Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
+        if (cart == null) {
+            CartResponse empty = new CartResponse();
+            empty.setId(null);
+            empty.setTotalPrice(BigDecimal.ZERO);
+            empty.setCartItemResponses(List.of());
+            res.setCode(200);
+            res.setMessage("Cart is empty");
+            res.setData(empty);
+            return res;
+        }
+
         CartResponse cartResponse = modelMapper.map(cart, CartResponse.class);
         List<CartItem> cartItemList = cartItemRepository.findCartItemByCartID(cart);
         List<CartItemResponse> cartItemResponses = cartItemList.stream()
                 .map(item -> {
-                    CartItemResponse response = modelMapper.map(item, CartItemResponse.class);
-                    response.setProductId(item.getProductID().getId());
-                    response.setProductName(item.getProductID().getProductName());
-                    response.setImageURL(item.getProductID().getImageURL());
-                    return response;
+                    CartItemResponse r = modelMapper.map(item, CartItemResponse.class);
+                    r.setProductId(item.getProductID().getId());
+                    r.setProductName(item.getProductID().getProductName());
+                    r.setImageURL(item.getProductID().getImageURL());
+                    return r;
                 })
                 .toList();
         cartResponse.setCartItemResponses(cartItemResponses);
-        return ResponseEntity.ok(cartResponse);
+
+        res.setCode(200);
+        res.setMessage("Fetched cart successfully");
+        res.setData(cartResponse);
+        return res;
     }
 
     @PostMapping("/add")
-    public ResponseEntity<?> cartInsert(@RequestBody CartInsertRequest request){
+    public ApiResponse<CartInsertResponse> cartInsert(@RequestBody CartInsertRequest request){
+        ApiResponse<CartInsertResponse> res = new ApiResponse<>();
+
         User user = userRepository.findUserById(request.getUserId());
+        if (user == null) {
+            res.setCode(404);
+            res.setMessage("User not found with ID: " + request.getUserId());
+            return res;
+        }
+
         Product product = productRepository.findProductById(request.getProductId());
         if (product == null) {
-            return ResponseEntity.status(404).body("Product not found with ID: " + request.getProductId());
+            res.setCode(404);
+            res.setMessage("Product not found with ID: " + request.getProductId());
+            return res;
         }
+
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            res.setCode(400);
+            res.setMessage("Quantity must be greater than 0");
+            return res;
+        }
+
         Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
-        if(cart == null){
+        if (cart == null) {
             Cart newCart = new Cart();
             newCart.setUserID(user);
             newCart.setTotalPrice(BigDecimal.ZERO);
             newCart.setStatus("ACTIVE");
             cart = cartRepository.save(newCart);
         }
-        CartItem cartItem = cartItemRepository.findCartItemByCartIDAndProductID(cart,product);
-        if(cartItem!=null){
 
-            Integer oldQuantityProduct = cartItem.getQuantity();
-            Integer newQuantityProduct = oldQuantityProduct+request.getQuantity();
-            cartItem.setQuantity(newQuantityProduct);
+        CartItem cartItem = cartItemRepository.findCartItemByCartIDAndProductID(cart, product);
+        BigDecimal totalPrice;
 
-            BigDecimal oldPrice = product.getPrice().multiply(BigDecimal.valueOf(oldQuantityProduct));
-            BigDecimal newPrice = product.getPrice().multiply(BigDecimal.valueOf(newQuantityProduct));
+        if (cartItem != null) {
+            int newQty = cartItem.getQuantity() + request.getQuantity();
+            BigDecimal oldPrice = product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            BigDecimal newPrice = product.getPrice().multiply(BigDecimal.valueOf(newQty));
+
+            cartItem.setQuantity(newQty);
             cartItem.setPrice(newPrice);
 
-            BigDecimal totalPrice = cartItem.getCartID().getTotalPrice().subtract(oldPrice).add(newPrice);
-            cartItem.getCartID().setTotalPrice(totalPrice);
+            totalPrice = cart.getTotalPrice().subtract(oldPrice).add(newPrice);
+            cart.setTotalPrice(totalPrice);
+
             cartItemRepository.save(cartItem);
-            CartInsertResponse response = new CartInsertResponse();
-            response.setMessage("Product add cart successfully");
-            response.setCartId(cart.getId());
-            response.setNewTotal(totalPrice);
-            return ResponseEntity.ok(response);
-        }else{
+            cartRepository.save(cart);
+        } else {
             CartItem newCartItem = new CartItem();
             newCartItem.setCartID(cart);
             newCartItem.setProductID(product);
             newCartItem.setQuantity(request.getQuantity());
+
             BigDecimal price = product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
             newCartItem.setPrice(price);
+
             cartItemRepository.save(newCartItem);
-            BigDecimal totalPrice = cart.getTotalPrice().add(price);
+
+            totalPrice = cart.getTotalPrice().add(price);
             cart.setTotalPrice(totalPrice);
             cartRepository.save(cart);
-            CartInsertResponse response = new CartInsertResponse();
-            response.setMessage("Product add cart successfully");
-            response.setCartId(cart.getId());
-            response.setNewTotal(totalPrice);
-            return ResponseEntity.ok(response);
         }
+
+        CartInsertResponse data = new CartInsertResponse();
+        data.setMessage("Product added to cart successfully");
+        data.setCartId(cart.getId());
+        data.setNewTotal(totalPrice);
+
+        res.setCode(200);
+        res.setMessage("OK");
+        res.setData(data);
+        return res;
     }
 
     @PutMapping("/update/{cartItemId}")
-    public ResponseEntity<?> cartUpdateQuantity(@PathVariable Integer cartItemId, CartUpdateRequest request){
+    public ApiResponse<CartItemUpdateResponse> cartUpdateQuantity(
+            @PathVariable Integer cartItemId,
+            @RequestBody CartUpdateRequest request){
+        ApiResponse<CartItemUpdateResponse> res = new ApiResponse<>();
+
         CartItem cartItem = cartItemRepository.findCartItemById(cartItemId);
+        if (cartItem == null) {
+            res.setCode(404);
+            res.setMessage("Cart item not found with ID: " + cartItemId);
+            return res;
+        }
+
+        if (request.getQuantity() == null || request.getQuantity() < 0) {
+            res.setCode(400);
+            res.setMessage("Quantity must be >= 0");
+            return res;
+        }
+
         Cart cart = cartItem.getCartID();
-        if(request.getQuantity()==0){
+
+        if (request.getQuantity() == 0) {
             BigDecimal oldPrice = cartItem.getPrice();
             cart.setTotalPrice(cart.getTotalPrice().subtract(oldPrice));
             cartRepository.save(cart);
             cartItemRepository.delete(cartItem);
-            return ResponseEntity.ok("Cart item removed from cart");
-        }else{
-            Integer oldQuantity = cartItem.getQuantity();
-            BigDecimal oldPrice = cartItem.getProductID().getPrice().multiply(BigDecimal.valueOf(oldQuantity));
+
+            CartItemUpdateResponse data = new CartItemUpdateResponse();
+            data.setMessage("Cart item removed from cart");
+            data.setCartId(cart.getId());
+            data.setTotalPrice(cart.getTotalPrice());
+
+            res.setCode(200);
+            res.setMessage("OK");
+            res.setData(data);
+            return res;
+        } else {
+            int oldQty = cartItem.getQuantity();
+            BigDecimal oldPrice = cartItem.getProductID().getPrice().multiply(BigDecimal.valueOf(oldQty));
+
             cartItem.setQuantity(request.getQuantity());
-            BigDecimal newPrice = cartItem.getProductID().getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
+            BigDecimal newPrice = cartItem.getProductID().getPrice()
+                    .multiply(BigDecimal.valueOf(request.getQuantity()));
             cartItem.setPrice(newPrice);
-            BigDecimal totalPrice = cartItem.getCartID().getTotalPrice().subtract(oldPrice).add(newPrice);
-            cartItem.getCartID().setTotalPrice(totalPrice);
+
+            BigDecimal totalPrice = cart.getTotalPrice().subtract(oldPrice).add(newPrice);
+            cart.setTotalPrice(totalPrice);
+
             cartItemRepository.save(cartItem);
-            CartItemUpdateResponse response = new CartItemUpdateResponse();
-            response.setMessage("Cart item quantity updated");
-            response.setCartId(cart.getId());
-            response.setTotalPrice(totalPrice);
-            return ResponseEntity.ok(response);
+            cartRepository.save(cart);
+
+            CartItemUpdateResponse data = new CartItemUpdateResponse();
+            data.setMessage("Cart item quantity updated");
+            data.setCartId(cart.getId());
+            data.setTotalPrice(totalPrice);
+
+            res.setCode(200);
+            res.setMessage("OK");
+            res.setData(data);
+            return res;
         }
     }
 
     @DeleteMapping("/item/{cartItemId}")
-    public ResponseEntity<?> cartDelete(@PathVariable Integer cartItemId){
+    public ApiResponse<String> cartDelete(@PathVariable Integer cartItemId){
+        ApiResponse<String> res = new ApiResponse<>();
+
         CartItem cartItem = cartItemRepository.findCartItemById(cartItemId);
+        if (cartItem == null) {
+            res.setCode(404);
+            res.setMessage("Cart item not found with ID: " + cartItemId);
+            return res;
+        }
+
         Cart cart = cartItem.getCartID();
         BigDecimal oldPrice = cartItem.getPrice();
         cart.setTotalPrice(cart.getTotalPrice().subtract(oldPrice));
         cartRepository.save(cart);
         cartItemRepository.delete(cartItem);
-        return ResponseEntity.ok("Cart item removed from cart");
+
+        res.setCode(200);
+        res.setMessage("Cart item removed from cart");
+        res.setData("Cart item removed from cart");
+        return res;
     }
 
     @DeleteMapping("/clear/{userId}")
-    public ResponseEntity<?> cartClear(@PathVariable Integer userId){
+    public ApiResponse<String> cartClear(@PathVariable Integer userId){
+        ApiResponse<String> res = new ApiResponse<>();
+
         User user = userRepository.findUserById(userId);
-        Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
-        if(cart!=null){
-            List<CartItem> cartItemList = cartItemRepository.findCartItemByCartID(cart);
-            cart.setTotalPrice(BigDecimal.ZERO);
-            cartRepository.save(cart);
-            cartItemRepository.deleteAll(cartItemList);
-            return ResponseEntity.ok("Cart cleared successfully");
+        if (user == null) {
+            res.setCode(404);
+            res.setMessage("User not found with ID: " + userId);
+            return res;
         }
-        return ResponseEntity.status(404).body("Cant found cart");
+
+        Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
+        if (cart == null) {
+            res.setCode(404);
+            res.setMessage("Cart not found for user");
+            return res;
+        }
+
+        List<CartItem> cartItemList = cartItemRepository.findCartItemByCartID(cart);
+        cart.setTotalPrice(BigDecimal.ZERO);
+        cartRepository.save(cart);
+        cartItemRepository.deleteAll(cartItemList);
+
+        res.setCode(200);
+        res.setMessage("Cart cleared successfully");
+        res.setData("Cart cleared successfully");
+        return res;
     }
-
-
 }

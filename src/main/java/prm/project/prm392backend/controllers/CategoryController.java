@@ -1,9 +1,8 @@
 package prm.project.prm392backend.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.CreateCategoryRequest;
 import prm.project.prm392backend.pojos.Category;
 import prm.project.prm392backend.repositories.CategoryRepository;
@@ -19,53 +18,98 @@ public class CategoryController {
     private CategoryRepository categoryRepository;
 
     @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestBody CreateCategoryRequest request) {
+    public ApiResponse<Category> createCategory(@RequestBody CreateCategoryRequest request) {
+        ApiResponse<Category> res = new ApiResponse<>();
+
+        if (request == null || request.getName() == null || request.getName().trim().isEmpty()) {
+            res.setCode(400);
+            res.setMessage("Category name is required");
+            res.setData(null);
+            return res;
+        }
+
         Category category = new Category();
-        category.setCategoryName(request.getName());
+        category.setCategoryName(request.getName().trim());
         Category savedCategory = categoryRepository.save(category);
-        return new ResponseEntity<>(savedCategory, HttpStatus.CREATED);
+
+        res.setCode(201); // Created
+        res.setMessage("Category created successfully");
+        res.setData(savedCategory);
+        return res;
     }
 
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories() {
+    public ApiResponse<List<Category>> getAllCategories() {
+        ApiResponse<List<Category>> res = new ApiResponse<>();
         List<Category> categories = categoryRepository.findAll();
-        return ResponseEntity.ok(categories);
+
+        res.setCode(200);
+        res.setMessage("Fetched categories successfully");
+        res.setData(categories);
+        return res;
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getCategoryById(@PathVariable Integer id) {
+    public ApiResponse<Category> getCategoryById(@PathVariable Integer id) {
+        ApiResponse<Category> res = new ApiResponse<>();
         Optional<Category> category = categoryRepository.findById(id);
+
         if (category.isPresent()) {
-            return ResponseEntity.ok(category.get());
+            res.setCode(200);
+            res.setMessage("Fetched category successfully");
+            res.setData(category.get());
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Category not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Category not found with id = " + id);
+            res.setData(null);
         }
+        return res;
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateCategory(@PathVariable Integer id,
-                                            @RequestBody CreateCategoryRequest newCategory) {
+    public ApiResponse<Category> updateCategory(@PathVariable Integer id,
+                                                @RequestBody CreateCategoryRequest newCategory) {
+        ApiResponse<Category> res = new ApiResponse<>();
+
         Optional<Category> existing = categoryRepository.findById(id);
         if (existing.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Category not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Category not found with id = " + id);
+            res.setData(null);
+            return res;
+        }
+
+        if (newCategory == null || newCategory.getName() == null || newCategory.getName().trim().isEmpty()) {
+            res.setCode(400);
+            res.setMessage("Category name is required");
+            res.setData(null);
+            return res;
         }
 
         Category category = existing.get();
-        category.setCategoryName(newCategory.getName());
+        category.setCategoryName(newCategory.getName().trim());
         Category updated = categoryRepository.save(category);
-        return ResponseEntity.ok(updated);
+
+        res.setCode(200);
+        res.setMessage("Category updated successfully");
+        res.setData(updated);
+        return res;
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteCategory(@PathVariable Integer id) {
+    public ApiResponse<String> deleteCategory(@PathVariable Integer id) {
+        ApiResponse<String> res = new ApiResponse<>();
+
         if (categoryRepository.existsById(id)) {
             categoryRepository.deleteById(id);
-            return ResponseEntity.ok("Deleted category with id = " + id);
+            res.setCode(200);
+            res.setMessage("Category deleted successfully");
+            res.setData("Deleted category with id = " + id);
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Category not found with id = " + id);
+            res.setCode(404);
+            res.setMessage("Category not found with id = " + id);
+            res.setData(null);
         }
+        return res;
     }
 }
