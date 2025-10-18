@@ -3,6 +3,7 @@ package prm.project.prm392backend.pojos;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import prm.project.prm392backend.enums.Role;
 
 @Getter
 @Setter
@@ -30,6 +31,7 @@ public class User {
     private String address;
 
     @Column(name = "Role", nullable = false, length = 50)
-    private String role;
+    @Enumerated(EnumType.STRING)
+    private Role role;
 
 }

@@ -11,6 +11,7 @@ import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.AuthResponse;
 import prm.project.prm392backend.dtos.LoginRequest;
 import prm.project.prm392backend.dtos.RegisterRequest;
+import prm.project.prm392backend.enums.Role;
 import prm.project.prm392backend.pojos.User;
 import prm.project.prm392backend.repositories.UserRepository;
 
@@ -52,14 +53,14 @@ public class AuthController {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setPhoneNumber(request.getPhoneNumber());
         user.setAddress(request.getAddress());
-        user.setRole(request.getRole() == null ? "User" : request.getRole());
+        user.setRole(Role.USER);
 
         userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString());
 
         authResponse.setUsername(user.getUsername());
-        authResponse.setRole(user.getRole());
+        authResponse.setRole(user.getRole().toString());
         authResponse.setToken(token);
 
         response.setMessage("User registered successfully!");
@@ -79,10 +80,10 @@ public class AuthController {
             response.setCode(400);
             return response;
         }
-        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString());
         AuthResponse authResponse = new AuthResponse();
         authResponse.setUsername(user.getUsername());
-        authResponse.setRole(user.getRole());
+        authResponse.setRole(user.getRole().toString());
         authResponse.setToken(token);
         response.setMessage("Login successful!");
         response.setData(authResponse);

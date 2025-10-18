@@ -3,6 +3,7 @@ package prm.project.prm392backend.controllers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.dtos.ApiResponse;
+import prm.project.prm392backend.enums.Role;
 import prm.project.prm392backend.pojos.User;
 import prm.project.prm392backend.repositories.UserRepository;
 import prm.project.prm392backend.configs.JwtUtil;
@@ -67,7 +68,7 @@ public class UserController {
         public String email;
         public String phoneNumber;
         public String address;
-        public String role;
+        public Role role;
 
         UserDTO(User u) {
             this.id = u.getId();
