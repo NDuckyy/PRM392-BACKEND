@@ -47,7 +47,7 @@ public class PaymentController {
             final String tmnCode = "U3CV658K";
             final String secretKey = "33X3QNHXS4MSQ39G58DZQ1R2XD05XCQQ";
             final String vnpUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-            final String returnUrl = "#" + order.getId();
+            final String returnUrl = "prm392://payment/result" + order.getId();
             final String currCode = "VND";
             // ========================================
 
