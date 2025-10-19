@@ -196,7 +196,7 @@ public class CartController {
         return ResponseEntity.ok(ApiResponse.ok("Cart item removed from cart", "Cart item removed from cart"));
     }
 
-    @DeleteMapping("/clear/{userId}")
+    @DeleteMapping("/clear/current-user}")
     @Transactional
     public ResponseEntity<ApiResponse<String>> cartClear(
             @Parameter(hidden = true)
