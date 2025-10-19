@@ -34,7 +34,7 @@ public class CartController {
     @Autowired private ModelMapper modelMapper;
 
 
-    @GetMapping("/current-user}")
+    @GetMapping("/current-user")
     public ResponseEntity<ApiResponse<CartResponse>> getCurrentCartByUserId(
             @Parameter(hidden = true)
             @RequestHeader("Authorization") String authHeader) {
@@ -69,8 +69,12 @@ public class CartController {
 
     @PostMapping("/add")
     @Transactional
-    public ResponseEntity<ApiResponse<CartInsertResponse>> cartInsert(@RequestBody CartInsertRequest request) {
-        User user = userRepository.findUserById(request.getUserId());
+    public ResponseEntity<ApiResponse<CartInsertResponse>> cartInsert(
+            @Parameter(hidden = true)
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody CartInsertRequest request) {
+        Integer userId = JwtUtil.extractUserId(authHeader);
+        User user = userRepository.findUserById(userId);
         if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
         Product product = productRepository.findProductById(request.getProductId());
@@ -196,7 +200,7 @@ public class CartController {
         return ResponseEntity.ok(ApiResponse.ok("Cart item removed from cart", "Cart item removed from cart"));
     }
 
-    @DeleteMapping("/clear/current-user}")
+    @DeleteMapping("/clear/current-user")
     @Transactional
     public ResponseEntity<ApiResponse<String>> cartClear(
             @Parameter(hidden = true)
