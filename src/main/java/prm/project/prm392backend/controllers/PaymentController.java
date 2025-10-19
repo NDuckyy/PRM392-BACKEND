@@ -26,7 +26,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/payment")
-@CrossOrigin("*")
 @RequiredArgsConstructor
 public class PaymentController {
 
