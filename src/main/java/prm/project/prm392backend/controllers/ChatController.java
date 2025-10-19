@@ -5,32 +5,38 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import com.google.firebase.messaging.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.ChatDtos.*;
+import prm.project.prm392backend.exceptions.AppException;
+import prm.project.prm392backend.exceptions.ErrorCode;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/chat")
+@RequiredArgsConstructor
 public class ChatController {
 
     private Firestore db() { return FirestoreClient.getFirestore(); }
 
     // ADMIN gửi tin -> ghi Firestore + cập nhật conversations + (tuỳ chọn) bắn FCM
     @PostMapping("/send")
-    public ApiResponse<MessageResponse> send(@RequestBody SendMessageRequest req) {
-        ApiResponse<MessageResponse> res = new ApiResponse<>();
-
-        if (req == null || req.conversationId() == null || req.conversationId().isBlank()
-                || req.message() == null || req.message().isBlank()) {
-            res.setCode(400);
-            res.setMessage("conversationId & message required");
-            res.setData(null);
-            return res;
+    public ResponseEntity<ApiResponse<MessageResponse>> send(@RequestBody SendMessageRequest req) {
+        if (req == null) throw new AppException(ErrorCode.MISSING_PARAMETER);
+        if (req.conversationId() == null || req.conversationId().isBlank()) {
+            throw new AppException(ErrorCode.CONVERSATION_ID_REQUIRED);
         }
-        String senderType = (req.senderType() == null) ? "ADMIN" : req.senderType();
+        if (req.message() == null || req.message().isBlank()) {
+            throw new AppException(ErrorCode.MESSAGE_REQUIRED);
+        }
+
+        String senderType = (req.senderType() == null || req.senderType().isBlank())
+                ? "ADMIN" : req.senderType();
 
         try {
             // 1) Ghi vào subcollection messages
@@ -59,12 +65,11 @@ public class ChatController {
             }
             convRef.set(convUpsert, SetOptions.merge()).get();
 
-            // Đọc lại timestamp thực tế
-            DocumentSnapshot snap = savedRef.get().get();
-            Timestamp ts = snap.getTimestamp("sentAt");
+            // 3) Lấy timestamp thực tế từ Firestore
+            Timestamp ts = savedRef.get().get().getTimestamp("sentAt");
             long millis = (ts != null) ? ts.toDate().getTime() : System.currentTimeMillis();
 
-            // 3) (Tuỳ chọn) gửi FCM cho khách
+            // 4) (Tuỳ chọn) gửi FCM cho khách
             if (req.userFcmToken() != null && !req.userFcmToken().isBlank()) {
                 try {
                     Notification nf = Notification.builder()
@@ -81,7 +86,7 @@ public class ChatController {
 
                     FirebaseMessaging.getInstance().send(fcm);
                 } catch (FirebaseMessagingException ignore) {
-                    // log nếu cần
+                    // Có thể log warn, nhưng không fail request
                 }
             }
 
@@ -94,32 +99,25 @@ public class ChatController {
                     millis
             );
 
-            res.setCode(201); // Created (vẫn trả HTTP 200, client đọc code này)
-            res.setMessage("Message sent");
-            res.setData(data);
-            return res;
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.ok(data, "Message sent"));
 
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            res.setCode(500);
-            res.setMessage(e.getMessage());
-            res.setData(null);
-            return res;
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
+        } catch (ExecutionException e) {
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
         }
     }
 
     // Lấy lịch sử 1 cuộc hội thoại
     @GetMapping("/messages")
-    public ApiResponse<List<MessageResponse>> list(
+    public ResponseEntity<ApiResponse<List<MessageResponse>>> list(
             @RequestParam String conversationId,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        ApiResponse<List<MessageResponse>> res = new ApiResponse<>();
         if (conversationId == null || conversationId.isBlank()) {
-            res.setCode(400);
-            res.setMessage("conversationId is required");
-            res.setData(null);
-            return res;
+            throw new AppException(ErrorCode.CONVERSATION_ID_REQUIRED);
         }
 
         try {
@@ -146,26 +144,21 @@ public class ChatController {
                 ));
             }
 
-            res.setCode(200);
-            res.setMessage("Fetched messages successfully");
-            res.setData(out);
-            return res;
+            return ResponseEntity.ok(ApiResponse.ok(out, "Fetched messages successfully"));
 
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            res.setCode(500);
-            res.setMessage(e.getMessage());
-            res.setData(null);
-            return res;
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
+        } catch (ExecutionException e) {
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
         }
     }
 
     // Liệt kê danh sách hội thoại cho bảng Admin
     @GetMapping("/conversations")
-    public ApiResponse<List<ConversationSummary>> conversations(
+    public ResponseEntity<ApiResponse<List<ConversationSummary>>> conversations(
             @RequestParam(defaultValue = "50") int limit
     ) {
-        ApiResponse<List<ConversationSummary>> res = new ApiResponse<>();
         try {
             ApiFuture<QuerySnapshot> fut = db().collection("conversations")
                     .orderBy("updatedAt", Query.Direction.DESCENDING)
@@ -183,17 +176,13 @@ public class ChatController {
                 ));
             }
 
-            res.setCode(200);
-            res.setMessage("Fetched conversations successfully");
-            res.setData(list);
-            return res;
+            return ResponseEntity.ok(ApiResponse.ok(list, "Fetched conversations successfully"));
 
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            res.setCode(500);
-            res.setMessage(e.getMessage());
-            res.setData(null);
-            return res;
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
+        } catch (ExecutionException e) {
+            throw new AppException(ErrorCode.EXTERNAL_SERVICE_ERROR);
         }
     }
 }

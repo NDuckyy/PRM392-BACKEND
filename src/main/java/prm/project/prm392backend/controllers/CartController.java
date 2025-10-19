@@ -2,8 +2,13 @@ package prm.project.prm392backend.controllers;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.dtos.*;
+import prm.project.prm392backend.exceptions.AppException;
+import prm.project.prm392backend.exceptions.ErrorCode;
 import prm.project.prm392backend.pojos.Cart;
 import prm.project.prm392backend.pojos.CartItem;
 import prm.project.prm392backend.pojos.Product;
@@ -20,95 +25,62 @@ import java.util.List;
 @RequestMapping("/cart")
 public class CartController {
 
-    @Autowired
-    CartRepository cartRepository;
-
-    @Autowired
-    CartItemRepository cartItemRepository;
-
-    @Autowired
-    ProductRepository productRepository;
-
-    @Autowired
-    UserRepository userRepository;
-
-    @Autowired
-    ModelMapper modelMapper;
+    @Autowired private CartRepository cartRepository;
+    @Autowired private CartItemRepository cartItemRepository;
+    @Autowired private ProductRepository productRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private ModelMapper modelMapper;
 
     @GetMapping("/{userId}")
-    public ApiResponse<CartResponse> getCurrentCartByUserId(@PathVariable Integer userId){
-        ApiResponse<CartResponse> res = new ApiResponse<>();
-
+    public ResponseEntity<ApiResponse<CartResponse>> getCurrentCartByUserId(@PathVariable Integer userId) {
         User user = userRepository.findUserById(userId);
-        if (user == null) {
-            res.setCode(404);
-            res.setMessage("User not found with ID: " + userId);
-            res.setData(null);
-            return res;
-        }
+        if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
-        Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
+        Cart cart = cartRepository.findCartByUserIDAndStatus(user, "ACTIVE");
+        CartResponse body = new CartResponse();
+
         if (cart == null) {
-            CartResponse empty = new CartResponse();
-            empty.setId(null);
-            empty.setTotalPrice(BigDecimal.ZERO);
-            empty.setCartItemResponses(List.of());
-            res.setCode(200);
-            res.setMessage("Cart is empty");
-            res.setData(empty);
-            return res;
+            // Giỏ trống → vẫn 200, trả empty payload
+            body.setId(null);
+            body.setTotalPrice(BigDecimal.ZERO);
+            body.setCartItemResponses(List.of());
+            return ResponseEntity.ok(ApiResponse.ok(body, "Cart is empty"));
         }
 
         CartResponse cartResponse = modelMapper.map(cart, CartResponse.class);
         List<CartItem> cartItemList = cartItemRepository.findCartItemByCartID(cart);
-        List<CartItemResponse> cartItemResponses = cartItemList.stream()
-                .map(item -> {
-                    CartItemResponse r = modelMapper.map(item, CartItemResponse.class);
-                    r.setProductId(item.getProductID().getId());
-                    r.setProductName(item.getProductID().getProductName());
-                    r.setImageURL(item.getProductID().getImageURL());
-                    return r;
-                })
-                .toList();
+        List<CartItemResponse> cartItemResponses = cartItemList.stream().map(item -> {
+            CartItemResponse r = modelMapper.map(item, CartItemResponse.class);
+            r.setProductId(item.getProductID().getId());
+            r.setProductName(item.getProductID().getProductName());
+            r.setImageURL(item.getProductID().getImageURL());
+            return r;
+        }).toList();
         cartResponse.setCartItemResponses(cartItemResponses);
 
-        res.setCode(200);
-        res.setMessage("Fetched cart successfully");
-        res.setData(cartResponse);
-        return res;
+        return ResponseEntity.ok(ApiResponse.ok(cartResponse, "Fetched cart successfully"));
     }
 
     @PostMapping("/add")
-    public ApiResponse<CartInsertResponse> cartInsert(@RequestBody CartInsertRequest request){
-        ApiResponse<CartInsertResponse> res = new ApiResponse<>();
-
+    @Transactional
+    public ResponseEntity<ApiResponse<CartInsertResponse>> cartInsert(@RequestBody CartInsertRequest request) {
         User user = userRepository.findUserById(request.getUserId());
-        if (user == null) {
-            res.setCode(404);
-            res.setMessage("User not found with ID: " + request.getUserId());
-            return res;
-        }
+        if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
         Product product = productRepository.findProductById(request.getProductId());
-        if (product == null) {
-            res.setCode(404);
-            res.setMessage("Product not found with ID: " + request.getProductId());
-            return res;
-        }
+        if (product == null) throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
 
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
-            res.setCode(400);
-            res.setMessage("Quantity must be greater than 0");
-            return res;
+            throw new AppException(ErrorCode.QUANTITY_INVALID);
         }
 
-        Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
+        Cart cart = cartRepository.findCartByUserIDAndStatus(user, "ACTIVE");
         if (cart == null) {
-            Cart newCart = new Cart();
-            newCart.setUserID(user);
-            newCart.setTotalPrice(BigDecimal.ZERO);
-            newCart.setStatus("ACTIVE");
-            cart = cartRepository.save(newCart);
+            cart = new Cart();
+            cart.setUserID(user);
+            cart.setTotalPrice(BigDecimal.ZERO);
+            cart.setStatus("ACTIVE");
+            cart = cartRepository.save(cart);
         }
 
         CartItem cartItem = cartItemRepository.findCartItemByCartIDAndProductID(cart, product);
@@ -148,29 +120,21 @@ public class CartController {
         data.setCartId(cart.getId());
         data.setNewTotal(totalPrice);
 
-        res.setCode(200);
-        res.setMessage("OK");
-        res.setData(data);
-        return res;
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.ok(data, "OK"));
     }
 
     @PutMapping("/update/{cartItemId}")
-    public ApiResponse<CartItemUpdateResponse> cartUpdateQuantity(
+    @Transactional
+    public ResponseEntity<ApiResponse<CartItemUpdateResponse>> cartUpdateQuantity(
             @PathVariable Integer cartItemId,
-            @RequestBody CartUpdateRequest request){
-        ApiResponse<CartItemUpdateResponse> res = new ApiResponse<>();
+            @RequestBody CartUpdateRequest request) {
 
         CartItem cartItem = cartItemRepository.findCartItemById(cartItemId);
-        if (cartItem == null) {
-            res.setCode(404);
-            res.setMessage("Cart item not found with ID: " + cartItemId);
-            return res;
-        }
+        if (cartItem == null) throw new AppException(ErrorCode.CART_ITEM_NOT_FOUND);
 
         if (request.getQuantity() == null || request.getQuantity() < 0) {
-            res.setCode(400);
-            res.setMessage("Quantity must be >= 0");
-            return res;
+            throw new AppException(ErrorCode.QUANTITY_INVALID);
         }
 
         Cart cart = cartItem.getCartID();
@@ -186,10 +150,7 @@ public class CartController {
             data.setCartId(cart.getId());
             data.setTotalPrice(cart.getTotalPrice());
 
-            res.setCode(200);
-            res.setMessage("OK");
-            res.setData(data);
-            return res;
+            return ResponseEntity.ok(ApiResponse.ok(data, "OK"));
         } else {
             int oldQty = cartItem.getQuantity();
             BigDecimal oldPrice = cartItem.getProductID().getPrice().multiply(BigDecimal.valueOf(oldQty));
@@ -210,23 +171,15 @@ public class CartController {
             data.setCartId(cart.getId());
             data.setTotalPrice(totalPrice);
 
-            res.setCode(200);
-            res.setMessage("OK");
-            res.setData(data);
-            return res;
+            return ResponseEntity.ok(ApiResponse.ok(data, "OK"));
         }
     }
 
     @DeleteMapping("/item/{cartItemId}")
-    public ApiResponse<String> cartDelete(@PathVariable Integer cartItemId){
-        ApiResponse<String> res = new ApiResponse<>();
-
+    @Transactional
+    public ResponseEntity<ApiResponse<String>> cartDelete(@PathVariable Integer cartItemId) {
         CartItem cartItem = cartItemRepository.findCartItemById(cartItemId);
-        if (cartItem == null) {
-            res.setCode(404);
-            res.setMessage("Cart item not found with ID: " + cartItemId);
-            return res;
-        }
+        if (cartItem == null) throw new AppException(ErrorCode.CART_ITEM_NOT_FOUND);
 
         Cart cart = cartItem.getCartID();
         BigDecimal oldPrice = cartItem.getPrice();
@@ -234,38 +187,23 @@ public class CartController {
         cartRepository.save(cart);
         cartItemRepository.delete(cartItem);
 
-        res.setCode(200);
-        res.setMessage("Cart item removed from cart");
-        res.setData("Cart item removed from cart");
-        return res;
+        return ResponseEntity.ok(ApiResponse.ok("Cart item removed from cart", "Cart item removed from cart"));
     }
 
     @DeleteMapping("/clear/{userId}")
-    public ApiResponse<String> cartClear(@PathVariable Integer userId){
-        ApiResponse<String> res = new ApiResponse<>();
-
+    @Transactional
+    public ResponseEntity<ApiResponse<String>> cartClear(@PathVariable Integer userId) {
         User user = userRepository.findUserById(userId);
-        if (user == null) {
-            res.setCode(404);
-            res.setMessage("User not found with ID: " + userId);
-            return res;
-        }
+        if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
-        Cart cart = cartRepository.findCartByUserIDAndStatus(user,"ACTIVE");
-        if (cart == null) {
-            res.setCode(404);
-            res.setMessage("Cart not found for user");
-            return res;
-        }
+        Cart cart = cartRepository.findCartByUserIDAndStatus(user, "ACTIVE");
+        if (cart == null) throw new AppException(ErrorCode.CART_NOT_FOUND);
 
         List<CartItem> cartItemList = cartItemRepository.findCartItemByCartID(cart);
         cart.setTotalPrice(BigDecimal.ZERO);
         cartRepository.save(cart);
         cartItemRepository.deleteAll(cartItemList);
 
-        res.setCode(200);
-        res.setMessage("Cart cleared successfully");
-        res.setData("Cart cleared successfully");
-        return res;
+        return ResponseEntity.ok(ApiResponse.ok("Cart cleared successfully", "Cart cleared successfully"));
     }
 }
