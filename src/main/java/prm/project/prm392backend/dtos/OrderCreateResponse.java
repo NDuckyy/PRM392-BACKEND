@@ -3,7 +3,7 @@ package prm.project.prm392backend.dtos;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 public class OrderCreateResponse {
@@ -13,6 +13,6 @@ public class OrderCreateResponse {
     String paymentMethod;
     String billingAddress;
     String orderStatus;
-    LocalDateTime orderDate;
+    Date orderDate;
 
 }

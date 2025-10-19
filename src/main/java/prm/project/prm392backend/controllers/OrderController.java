@@ -1,6 +1,7 @@
 package prm.project.prm392backend.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
@@ -36,12 +37,16 @@ public class OrderController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<ApiResponse<OrderCreateResponse>> create(@RequestBody OrderCreateRequest request) {
-        if (request == null || request.getUserId() == null) {
+    public ResponseEntity<ApiResponse<OrderCreateResponse>> create(
+            @Parameter(hidden = true)
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody OrderCreateRequest request) {
+        Integer userId = JwtUtil.extractUserId(authHeader);
+        if (request == null || userId == null) {
             throw new AppException(ErrorCode.MISSING_PARAMETER);
         }
 
-        User user = userRepository.findUserById(request.getUserId());
+        User user = userRepository.findUserById(userId);
         if (user == null) {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
         }
@@ -63,6 +68,8 @@ public class OrderController {
             orderRepository.save(order);
 
             OrderCreateResponse data = modelMapper.map(order, OrderCreateResponse.class);
+            data.setTotalPrice(cart.getTotalPrice());
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.ok(data, "Order created successfully"));
         } catch (Exception e) {
