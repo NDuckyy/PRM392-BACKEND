@@ -1,11 +1,13 @@
 package prm.project.prm392backend.controllers;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.configs.JwtUtil;
 import prm.project.prm392backend.dtos.*;
 import prm.project.prm392backend.exceptions.AppException;
 import prm.project.prm392backend.exceptions.ErrorCode;
@@ -31,8 +33,12 @@ public class CartController {
     @Autowired private UserRepository userRepository;
     @Autowired private ModelMapper modelMapper;
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<ApiResponse<CartResponse>> getCurrentCartByUserId(@PathVariable Integer userId) {
+
+    @GetMapping("/current-user}")
+    public ResponseEntity<ApiResponse<CartResponse>> getCurrentCartByUserId(
+            @Parameter(hidden = true)
+            @RequestHeader("Authorization") String authHeader) {
+        Integer userId = JwtUtil.extractUserId(authHeader);
         User user = userRepository.findUserById(userId);
         if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
@@ -192,7 +198,10 @@ public class CartController {
 
     @DeleteMapping("/clear/{userId}")
     @Transactional
-    public ResponseEntity<ApiResponse<String>> cartClear(@PathVariable Integer userId) {
+    public ResponseEntity<ApiResponse<String>> cartClear(
+            @Parameter(hidden = true)
+            @RequestHeader("Authorization") String authHeader) {
+        Integer userId = JwtUtil.extractUserId(authHeader);
         User user = userRepository.findUserById(userId);
         if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
