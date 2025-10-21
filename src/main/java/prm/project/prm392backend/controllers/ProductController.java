@@ -1,17 +1,23 @@
 package prm.project.prm392backend.controllers;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.configs.JwtUtil;
 import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.CreateOrUpdateProductRequest;
 import prm.project.prm392backend.exceptions.AppException;
 import prm.project.prm392backend.exceptions.ErrorCode;
 import prm.project.prm392backend.pojos.Category;
 import prm.project.prm392backend.pojos.Product;
+import prm.project.prm392backend.pojos.Provider;
+import prm.project.prm392backend.pojos.User;
 import prm.project.prm392backend.repositories.CategoryRepository;
 import prm.project.prm392backend.repositories.ProductRepository;
+import prm.project.prm392backend.repositories.ProviderRepository;
+import prm.project.prm392backend.repositories.UserRepository;
 
 import java.util.List;
 
@@ -20,11 +26,39 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    @Autowired
+    private  ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private ProviderRepository providerRepository;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Product>> createProduct(@RequestBody CreateOrUpdateProductRequest request) {
+    public ResponseEntity<ApiResponse<Product>> createProduct(@RequestBody CreateOrUpdateProductRequest request,
+                                                              @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new AppException(ErrorCode.AUTH_MISSING);
+        }
+        String token = authHeader.substring(7).trim();
+
+        if (!JwtUtil.validateToken(token)) {
+            throw new AppException(ErrorCode.AUTH_INVALID);
+        }
+
+        Integer userId = JwtUtil.extractUserId(token);
+        if (userId == null) {
+            throw new AppException(ErrorCode.TOKEN_NO_USERID);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
         if (request == null || request.getCategoryId() == null) {
             throw new AppException(ErrorCode.CATEGORY_ID_REQUIRED);
         }
@@ -35,6 +69,11 @@ public class ProductController {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        Provider provider = providerRepository.findByUser(user);
+        if(provider == null){
+            throw new AppException(ErrorCode.PROVIDER_NOT_FOUND);
+        }
+
         Product product = new Product();
         product.setProductName(request.getProductName().trim());
         product.setBriefDescription(request.getBriefDescription());
@@ -43,6 +82,7 @@ public class ProductController {
         product.setPrice(request.getPrice());
         product.setImageURL(request.getImageURL());
         product.setCategoryID(category);
+        product.setProvider(provider);
 
         Product saved = productRepository.save(product);
 
