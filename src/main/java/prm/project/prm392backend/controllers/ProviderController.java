@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.configs.JwtUtil;
 import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.RegisterProviderRequest;
+import prm.project.prm392backend.enums.Role;
 import prm.project.prm392backend.exceptions.AppException;
 import prm.project.prm392backend.exceptions.ErrorCode;
 import prm.project.prm392backend.pojos.Provider;
@@ -41,10 +42,16 @@ public class ProviderController {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        Provider existingProvider = providerRepository.findByUser(user);
+        if (existingProvider != null) {
+            throw new AppException(ErrorCode.PROVIDER_ALREADY_EXISTS);
+        }
         Provider provider = new Provider();
         provider.setProviderName(registerProviderRequest.getName());
         provider.setUser(user);
         providerRepository.save(provider);
+        user.setRole(Role.PROVIDER);
+        userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.ok(null, "Provider registered successfully"));
     }
 }

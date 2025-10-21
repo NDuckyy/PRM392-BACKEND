@@ -34,7 +34,9 @@ public enum ErrorCode {
     CATEGORY_ID_REQUIRED(400, "categoryId is required", HttpStatus.BAD_REQUEST),
     PRODUCT_CONFLICT(409, "Product already exists", HttpStatus.CONFLICT),
 
-    PROVIDER_NOT_FOUND(404, "Provider not found", HttpStatus.NOT_FOUND)
+    PROVIDER_NOT_FOUND(404, "You are not the provider", HttpStatus.NOT_FOUND),
+
+    PROVIDER_ALREADY_EXISTS(400, "You are already a supplier", HttpStatus.CONFLICT)
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {
