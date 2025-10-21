@@ -69,8 +69,12 @@ public class CartController {
 
     @PostMapping("/add")
     @Transactional
-    public ResponseEntity<ApiResponse<CartInsertResponse>> cartInsert(@RequestBody CartInsertRequest request) {
-        User user = userRepository.findUserById(request.getUserId());
+    public ResponseEntity<ApiResponse<CartInsertResponse>> cartInsert(
+            @Parameter(hidden = true)
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody CartInsertRequest request) {
+        Integer userId = JwtUtil.extractUserId(authHeader);
+        User user = userRepository.findUserById(userId);
         if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
         Product product = productRepository.findProductById(request.getProductId());
