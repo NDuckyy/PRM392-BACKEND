@@ -82,6 +82,7 @@ public class ProductController {
         product.setPrice(request.getPrice());
         product.setImageURL(request.getImageURL());
         product.setCategoryID(category);
+        product.setStockQuantity(request.getStockQuantity());
         product.setProvider(provider);
 
         Product saved = productRepository.save(product);
@@ -128,6 +129,7 @@ public class ProductController {
         existing.setTechnicalSpecifications(request.getTechnicalSpecifications());
         existing.setPrice(request.getPrice());
         existing.setImageURL(request.getImageURL());
+        existing.setStockQuantity(request.getStockQuantity());
         existing.setCategoryID(category);
 
         Product updated = productRepository.save(existing);
