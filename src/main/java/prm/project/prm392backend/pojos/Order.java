@@ -38,4 +38,8 @@ public class Order {
     @Column(name = "OrderDate", nullable = false)
     private Date orderDate;
 
+    @ManyToOne
+    @JoinColumn(name = "ProviderID")
+    private Provider provider;
+
 }

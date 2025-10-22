@@ -6,13 +6,17 @@ import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import prm.project.prm392backend.configs.JwtUtil;
 import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.dtos.ChatDtos.*;
 import prm.project.prm392backend.exceptions.AppException;
 import prm.project.prm392backend.exceptions.ErrorCode;
+import prm.project.prm392backend.pojos.User;
+import prm.project.prm392backend.repositories.UserRepository;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -22,11 +26,32 @@ import java.util.concurrent.ExecutionException;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private Firestore db() { return FirestoreClient.getFirestore(); }
+    @Autowired
+    private UserRepository userRepository;
+
+    private Firestore db() {
+        return FirestoreClient.getFirestore();
+    }
 
     // ADMIN gửi tin -> ghi Firestore + cập nhật conversations + (tuỳ chọn) bắn FCM
     @PostMapping("/send")
-    public ResponseEntity<ApiResponse<MessageResponse>> send(@RequestBody SendMessageRequest req) {
+    public ResponseEntity<ApiResponse<MessageResponse>> send(@RequestBody SendMessageRequest req, @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new AppException(ErrorCode.AUTH_MISSING);
+        }
+        String token = authHeader.substring(7).trim();
+
+        if (!JwtUtil.validateToken(token)) {
+            throw new AppException(ErrorCode.AUTH_INVALID);
+        }
+
+        Integer userId = JwtUtil.extractUserId(token);
+        if (userId == null) {
+            throw new AppException(ErrorCode.TOKEN_NO_USERID);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         if (req == null) throw new AppException(ErrorCode.MISSING_PARAMETER);
         if (req.conversationId() == null || req.conversationId().isBlank()) {
             throw new AppException(ErrorCode.CONVERSATION_ID_REQUIRED);
@@ -48,7 +73,7 @@ public class ChatController {
             Map<String, Object> doc = new HashMap<>();
             doc.put("conversationId", req.conversationId());
             doc.put("senderType", senderType);
-            doc.put("senderId", req.senderId());
+            doc.put("senderId", user.getUsername());
             doc.put("message", req.message());
             doc.put("sentAt", FieldValue.serverTimestamp());
 
@@ -94,7 +119,7 @@ public class ChatController {
                     savedRef.getId(),
                     req.conversationId(),
                     senderType,
-                    req.senderId(),
+                    user.getUsername(),
                     req.message(),
                     millis
             );
