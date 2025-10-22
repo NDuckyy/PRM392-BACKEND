@@ -14,5 +14,6 @@ public class CreateOrUpdateProductRequest {
     private String technicalSpecifications;
     private BigDecimal price;
     private String imageURL;
+    private Integer stockQuantity;
     private Integer categoryId; // ID của category
 }

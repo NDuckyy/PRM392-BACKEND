@@ -37,7 +37,8 @@ public class CartController {
     @GetMapping("/current-user")
     public ResponseEntity<ApiResponse<CartResponse>> getCurrentCartByUserId(
             @Parameter(hidden = true)
-            @RequestHeader("Authorization") String authHeader) {
+            @RequestHeader("Authorization") String authHeader)
+    {
         Integer userId = JwtUtil.extractUserId(authHeader);
         User user = userRepository.findUserById(userId);
         if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
