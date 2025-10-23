@@ -132,7 +132,7 @@ public class PaymentController {
             order.setOrderStatus("PAID");
             orderRepository.save(order);
 
-            List<CartItem> cartItemList = cartItemRepository.findAllByCartId(order.getCartID());
+            List<CartItem> cartItemList = cartItemRepository.findAllByCartID(order.getCartID());
             if(cartItemList.isEmpty()){
                 return null;
             }
