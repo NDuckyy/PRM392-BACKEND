@@ -54,6 +54,7 @@ public class AuthController {
         auth.setUsername(user.getUsername());
         auth.setRole(user.getRole().toString());
         auth.setToken(token);
+        auth.setUserId(user.getId());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(auth, "User registered successfully"));
