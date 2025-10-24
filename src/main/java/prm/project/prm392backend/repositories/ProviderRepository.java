@@ -9,4 +9,6 @@ import prm.project.prm392backend.pojos.User;
 @Repository
 public interface ProviderRepository extends JpaRepository<Provider,Integer> {
     Provider findByUser(User user);
+
+    Provider findByProviderName(String providerName);
 }
