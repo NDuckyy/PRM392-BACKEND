@@ -1,6 +1,7 @@
 package prm.project.prm392backend.controllers;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,10 +9,14 @@ import org.springframework.web.bind.annotation.*;
 import prm.project.prm392backend.dtos.ApiResponse;
 import prm.project.prm392backend.exceptions.AppException;
 import prm.project.prm392backend.exceptions.ErrorCode;
+import prm.project.prm392backend.pojos.CartItem;
 import prm.project.prm392backend.pojos.Order;
 import prm.project.prm392backend.pojos.Payment;
+import prm.project.prm392backend.pojos.Product;
+import prm.project.prm392backend.repositories.CartItemRepository;
 import prm.project.prm392backend.repositories.OrderRepository;
 import prm.project.prm392backend.repositories.PaymentRepository;
+import prm.project.prm392backend.repositories.ProductRepository;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -23,6 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/payment")
@@ -31,6 +37,12 @@ public class PaymentController {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+
+    @Autowired
+    CartItemRepository cartItemRepository;
+
+    @Autowired
+    ProductRepository productRepository;
 
     @PostMapping("/url/{orderId}")
     public ResponseEntity<ApiResponse<String>> createPaymentUrl(@PathVariable Integer orderId) {
@@ -116,9 +128,32 @@ public class PaymentController {
         }
 
         try {
-            // cập nhật trạng thái Order + tạo Payment
+
             order.setOrderStatus("PAID");
             orderRepository.save(order);
+
+            List<CartItem> cartItemList = cartItemRepository.findAllByCartID(order.getCartID());
+            if(cartItemList.isEmpty()){
+                return null;
+            }
+
+            for (CartItem cartItem : cartItemList) {
+                Product product = cartItem.getProductID();
+                int newStock = product.getStockQuantity() - cartItem.getQuantity();
+
+                if (newStock < 0) {
+                    throw new IllegalArgumentException("Sản phẩm " + product.getProductName() + " không đủ hàng tồn kho!");
+                }
+
+                product.setStockQuantity(newStock);
+            }
+
+            productRepository.saveAll(
+                    cartItemList.stream()
+                            .map(CartItem::getProductID)
+                            .toList()
+            );
+
 
             Payment payment = new Payment();
             payment.setPaymentStatus("SUCCESS");

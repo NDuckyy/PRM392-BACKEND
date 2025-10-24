@@ -44,4 +44,6 @@ public class Product {
     @JoinColumn(name = "ProviderID")
     private Provider provider;
 
+    private Integer stockQuantity;
+
 }

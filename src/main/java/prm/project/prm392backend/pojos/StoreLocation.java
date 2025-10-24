@@ -12,8 +12,8 @@ import java.math.BigDecimal;
 @Table(name = "StoreLocations", schema = "SalesAppDB")
 public class StoreLocation {
     @Id
-    @Column(name = "LocationID", nullable = false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "LocationID", nullable = false)
     private Integer id;
 
     @Column(name = "Latitude", nullable = false, precision = 9, scale = 6)
@@ -25,4 +25,7 @@ public class StoreLocation {
     @Column(name = "Address", nullable = false)
     private String address;
 
+    @OneToOne
+    @JoinColumn(name = "ProviderID", referencedColumnName = "ProviderID")
+    private Provider provider;
 }

@@ -24,6 +24,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/payment/**").permitAll()
                         .requestMatchers("/api/products/**", "/api/providers/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/location/{providerId}").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(e -> e
