@@ -16,6 +16,7 @@ import prm.project.prm392backend.exceptions.ErrorCode;
 import prm.project.prm392backend.pojos.*;
 import prm.project.prm392backend.repositories.*;
 
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -108,13 +109,15 @@ public class OrderController {
         }
 
         User user = userRepository.findUserById(userId);
-        // Tuỳ business: nếu token hợp lệ nhưng user đã bị xoá → 404
         if (user == null) {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
         }
 
         List<Order> orders = orderRepository.findOrdersByUserID(user);
         List<OrderDetail> orderDetails = orderDetailRepository.findAllByOrderIn(orders);
+
+        // 🔹 Sắp xếp: đơn mới nhất lên đầu
+        orders.sort(Comparator.comparing(Order::getOrderDate).reversed());
 
         Map<Integer, List<OrderDetail>> detailsByOrderId = orderDetails.stream()
                 .collect(Collectors.groupingBy(od -> od.getOrder().getId()));
@@ -156,4 +159,5 @@ public class OrderController {
 
         return ResponseEntity.ok(ApiResponse.ok(orderResponses, "Fetched orders successfully"));
     }
+
 }
